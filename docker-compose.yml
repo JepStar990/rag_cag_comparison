@@ -32,7 +32,7 @@ services:
     ports: ["9998:9998"]
 
   embeddings:
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
     container_name: embeddings
     ports: ["8080:80"]
     environment:
