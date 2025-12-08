@@ -1,0 +1,2 @@
+Cache-Augmented Generation (CAG) improves latency by caching retrieval results, prompts, and answers.
+Safe reuse requires similarity gating (e.g., cosine >= 0.92) and index/model version checks.

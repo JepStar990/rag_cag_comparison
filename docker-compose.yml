@@ -33,50 +33,64 @@ services:
 
   embeddings:
     image: ghcr.io/huggingface/text-embeddings-inference:latest
-    container_name: embeddings
     ports: ["8080:80"]
-    environment:
-      MODEL_ID: BAAI/bge-m3
-      MAX_CLIENTS: 16
-      EMBEDDING_DIM: 1024
+    command: --model-id BAAI/bge-m3 --device cpu
 
-  vllm:
-    image: vllm/vllm-openai:latest
-    container_name: vllm
-    ports: ["8000:8000"]
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
     environment:
-      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
-    command: >
-      --model meta-llama/Llama-3.1-8B-Instruct
-      --download-dir /models
-      --port 8000
-      --trust-remote-code
-      --enable-prefix-caching
-
+      OLLAMA_HOST: 0.0.0.0
     volumes:
-      - vllm-models:/models
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
 
+  # Cross-encoder reranker (CPU)
+  reranker:
+    build:
+      context: ./services/reranker
+    container_name: reranker
+    environment:
+      RERANKER_MODEL_ID: BAAI/bge-reranker-v2-m3
+    ports: ["7002:7002"]
+
+  # ASR (faster-whisper on CPU)
   asr:
     build:
       context: ./services/asr
-      dockerfile: Dockerfile
     container_name: asr
     ports: ["7001:7001"]
 
+  # FastAPI orchestrator
   api:
     build:
       context: ./services/api
-      dockerfile: Dockerfile
     container_name: api
-    depends_on: [qdrant, redis, minio, embeddings, vllm, tika, asr]
+    depends_on:
+      - qdrant
+      - redis
+      - minio
+      - tika
+      - asr
+      - reranker
+      - ollama
     ports: ["8081:8081"]
     env_file:
       - ./configs/.env
     environment:
       VECTOR_DB_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379/0
-      EMB_URL: http://embeddings:80
-      LLM_URL: http://vllm:8000
+      LLM_URL: http://ollama:11434
+      LLM_MODEL: llama3.2:3b-instruct
+      EMB_PROVIDER: ollama
+      OLLAMA_EMB_MODEL: nomic-embed-text
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
@@ -84,14 +98,15 @@ services:
       MINIO_BUCKET: ai-data
       TIKA_URL: http://tika:9998
       ASR_URL: http://asr:7001
+      RERANKER_URL: http://reranker:7002
       INDEX_COLLECTION: ai_chunks
       INDEX_VERSION: "1"
       CACHE_SIM_THRESHOLD: "0.92"
     volumes:
-      - ../data:/app/data
+      - ./data:/app/data
 
 volumes:
   qdrant-data:
   redis-data:
   minio-data:
-  vllm-models:
+  ollama-data:

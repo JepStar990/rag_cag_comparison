@@ -1,11 +1,11 @@
 from app.utils.cache import Cache
-from app.utils.embeddings import embed_query, embed_texts
+from app.utils.embeddings import embed_query
 from app.utils.vector import search_chunks
 from app.utils.llm import chat_completion
 from app.utils.similarity import cosine
+from app.utils.reranker_client import rerank
 
 SYSTEM_PROMPT = "You are a helpful assistant. Answer using ONLY provided context. Cite source ids."
-
 cache = Cache()
 
 def build_prompt(query: str, passages: list[dict]) -> str:
@@ -13,24 +13,28 @@ def build_prompt(query: str, passages: list[dict]) -> str:
     return f"{SYSTEM_PROMPT}\n\n# Context\n{ctx}\n\n# Question\n{query}\n\n# Answer\n"
 
 def cag_rag_answer(query: str, k: int, max_tokens: int, collection: str, sim_threshold: float):
-    # Safe answer cache
+    # 1) Safe answer cache
     ans = cache.get_answer(query)
     if ans:
         qvec = embed_query(query)
         if cosine(qvec, ans["qvec"]) >= sim_threshold:
             return {"pipeline": "CAG+RAG", "answer": ans["text"], "cached": True}
 
-    # Retrieval cache (top-k ids & payloads)
-    topk = cache.get_topk(query)
-    if not topk:
-        qvec = embed_query(query)
-        passages = search_chunks(collection=collection, query_vec=qvec, limit=k)
-        cache.put_topk(query, passages)
+    # 2) Retrieval → rerank (with topk cache)
+    topk_cached = cache.get_topk(query)
+    if topk_cached:
+        prelim = topk_cached
     else:
-        passages = topk
+        qvec = embed_query(query)
+        prelim = search_chunks(collection=collection, query_vec=qvec, limit=max(k*3, 24))
+        cache.put_topk(query, prelim)
 
-    prompt = build_prompt(query, passages)
+    ranked = rerank(query, prelim)
+    topk = ranked[:k]
+
+    # 3) Generation + write-back
+    prompt = build_prompt(query, topk)
     answer = chat_completion(prompt, max_tokens=max_tokens)
     cache.put_answer(query, answer, embed_query(query))
-    cites = [p["id"] for p in passages]
-    return {"pipeline": "CAG+RAG", "answer": answer, "citations": cites, "cached": False}
+    cites = [p["id"] for p in topk]
+    return {"pipeline": "CAG+RAG", "answer": answer, "citations": cites, "cached": False, "reranked": True}

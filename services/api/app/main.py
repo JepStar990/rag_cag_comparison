@@ -58,7 +58,6 @@ async def ingest(file: UploadFile = File(...), source_uri: str = Form(None)):
     # Decide extraction path
     media_lower = (fname or "").lower()
     if any(media_lower.endswith(ext) for ext in [".mp3", ".wav", ".m4a", ".mp4", ".mov", ".mkv"]):
-        # Send to ASR microservice
         import httpx
         asr_url = os.getenv("ASR_URL", "http://asr:7001")
         files = {"file": (fname, content, file.content_type)}
@@ -114,8 +113,4 @@ def cag_rag_endpoint(req: QueryRequest):
 # ---- Admin ----
 @app.post("/admin/bump_index")
 def bump_index():
-    """
-    Invalidate caches by bumping INDEX_VERSION (restart container with new env),
-    but we emulate here by telling clients to update.
-    """
-    return {"message": "To bump index version, update INDEX_VERSION env and restart api/vllm", "current": INDEX_VERSION}
+    return {"message": "To bump index version, update INDEX_VERSION env and restart api service", "current": INDEX_VERSION}

@@ -1,0 +1,4 @@
+Q: How do I request access to the analytics sandbox?
+A: Submit a ticket in ServiceNow with manager approval. Provisioning SLA: 2 business days.
+Q: Where do I find the data catalog?
+A: Visit /data/catalog on the intranet.

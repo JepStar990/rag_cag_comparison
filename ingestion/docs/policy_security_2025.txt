@@ -1,0 +1,4 @@
+Title: Information Security Policy FY2025
+Principles: Least privilege, MFA mandatory, data classification.
+Controls: Encryption-at-rest (AES-256), transport TLS1.2+, quarterly audit.
+Incident Response: Report within 24h via ServiceDesk.
