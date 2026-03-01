@@ -97,7 +97,7 @@ rag\_cag\_comparison/
 ## 🚀 How to Run
 1. Clone the repo:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/JepStar990/rag_cag_comparison.git
    cd rag_cag_comparison
 
 2.  Start services:
@@ -128,3 +128,4 @@ rag\_cag\_comparison/
 ## 📜 License
 
 MIT License
+
